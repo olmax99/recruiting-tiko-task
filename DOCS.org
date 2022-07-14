@@ -1,0 +1,98 @@
+#+TITLE: Take Home Challenge
+#+SETUPFILE: ~/s3sync/org/conf/setup.config
+#+FILETAGS: :recruiting:tiko
+
+* Prerequisites
+- Python (anaconda3-2022.05)
+
+* Design
+#+CAPTION: general-approach
+#+attr_html: :width 100%
+
+[[file:docs/general-approach.drawio.png][file:./docs/general-approach.drawio.png]]
+
+* Approach
+** Exercise 1: K8s
+- Review Kind and run the deployment
+- Fix the issue regarding control-plane connection (I simply changed the port in
+  =kubeconfig= file to match the =tiko-control-plane= docker port (could have been
+  done the other way around as well)
+- Create a "project design". This is probably not needed for a smaller exercise,
+  but this would be my approach especially with regards to network relevant
+  dependencies. I.e. hybrid- or multi-cluster setups.
+- ..
+
+**** Sub-task: Helm deployment runner
+- After apps deployment, only =prometheus= is up
+#+begin_src bash
+$ helm --kubeconfig infra/kubeconfig list --all --all-namespaces
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                           APP VERSION
+prometheus      monitoring      1               2022-07-13 19:04:10.820234091 +0000 UTC deployed        kube-prometheus-stack-37.2.0    0.57.0
+#+end_src
+
+*** Remarks
+- I haven't been using _kind_ before. My local clusters where in [[https://minikube.sigs.k8s.io/docs/][minikube]], [[https://k3s.io/][k3s.io]],
+  and [[https://rancher.com/docs/rke/latest/en/][rke]].
+- From all the solutions RKE offers the possibility to run on Vagrant and in
+  production the exact same way. I think this (pretty transparent) deployment
+  pattern got neglected in the Kubernetes community a lot. I.e try running EKS
+  locally???
+
+
+** Exercise 2: Programming
+- Inspect the code (all code bases)
+- Run functions, Js in browser (i.e. using log.console)
+- Use IDE to jump into function definitions (either docs or jumping to package sources)
+- Explain the logic in simple words
+
+** Exercise 3: Terrafom
+- Searching for the appropriate terraform module: [[https://registry.terraform.io/modules/terraform-aws-modules/s3-bucket/aws/3.3.0][terraform-aws-modules/s3-bucket/aws/3.3.0]]
+- Loading module inside main with simple hardcoded values and smoke-test
+  deployment in own account
+- Create a map variable that holds the dynamic values, smoke-test with terraform
+  plan => there should be no changes if it is correct
+- Create a =locals= function that is creating the map dynamically from a given
+  list input, again try with hard-coded list in =terraform.tfvars=, so that there
+  are no changes in terraform plan (inpect map output)
+- Finally, I've decided to use Python to create a =terraform.tfvars.json=
+
+#+begin_src bash
+$ python scripts/generate_tfvars.py -h
+$ python scripts/generate_tfvars.py 100
+#+end_src
+
+*** Remarks
+- Usually, in my own projects I have a slightly different approach.
+- I've build my own terraform wrapper in Golang. This wrapper is CI ready and
+  offers the possibility to inject =*.tfvars= files dynamically as well
+- In Golang (but I am sure that this is possible with Python as well) I am using
+  the =text/template= package for generating hcl template files. This is slightly more
+  involved but the extra step in having a file, helps to review if necessary.
+- I am using validate linters for hcl, so terraform will not even run if the
+  files do not come out in the proper format. Also, it allows for writing tests.
+- Next to that, it is obviously needed to provide some kind of secret
+  management. Currently I am using my wrappertool and [[https://www.gopass.pw/][https://www.gopass.pw/]].
+- Ultimately, this process could be replaced with a production Hashicorp Vault
+  setup (especially for CI)
+- Terraform now offers a =pass-store= resource that is also using =Gopass=.
+- For the sake of demonstration and your exercise, I decided to build a new
+  Python script for generating the variables, instead of using my own tools.
+- If you are interested I am happy to demonstrate them.
+
+* General Instructions
+** Sub-topic 1
+- ..
+
+* Author
+Olaf Marangone
+Contact: olaf.marangone@gmail.com
+
+* Credits
+- ..
+
+* More sources
+- ..
+
+* Where to go from here?
+- ..
+
