@@ -22,13 +22,103 @@
   dependencies. I.e. hybrid- or multi-cluster setups.
 - ..
 
-**** Sub-task: Helm deployment runner
+*** 1. Sub-Task: Troubleshooting
+**** Fixing runner deployment
 - After apps deployment, only =prometheus= is up
 #+begin_src bash
 $ helm --kubeconfig infra/kubeconfig list --all --all-namespaces
 NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                           APP VERSION
 prometheus      monitoring      1               2022-07-13 19:04:10.820234091 +0000 UTC deployed        kube-prometheus-stack-37.2.0    0.57.0
 #+end_src
+
+- running manually did not pose a problem (release wise)
+#+begin_src bash
+$ helm --kubeconfig ./infra/kubeconfig install runner ./apps/charts/runner --namespace runner --create-namespace
+NAME: runner
+LAST DEPLOYED: Thu Jul 14 11:41:47 2022
+NAMESPACE: runner
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+$ helm --kubeconfig infra/kubeconfig list --failed
+NAME    NAMESPACE       REVISION        UPDATED STATUS  CHART   APP VERSION
+
+$ helm --kubeconfig infra/kubeconfig ls --all --all-namespaces
+NAME            NAMESPACE       REVISION        UPDATED                                         STATUS          CHART                           APP VERSION
+prometheus      monitoring      1               2022-07-13 19:04:10.820234091 +0000 UTC         deployed        kube-prometheus-stack-37.2.0    0.57.0     
+runner          runner          1               2022-07-14 11:41:47.746516074 +0200 CEST        deployed        runner-0.1.0                    1.16.0     
+
+$ helm --kubeconfig infra/kubeconfig ls --all --all-namespaces
+NAME            NAMESPACE       REVISION        UPDATED                                         STATUS          CHART                           APP VERSION
+prometheus      monitoring      1               2022-07-13 19:04:10.820234091 +0000 UTC         deployed        kube-prometheus-stack-37.2.0    0.57.0     
+runner          runner          1               2022-07-14 11:41:47.746516074 +0200 CEST        deployed        runner-0.1.0                    1.16.0     
+#+end_src
+
+- runner ends up in =CrashLoop=
+#+begin_src bash
+$ kubectl --kubeconfig infra/kubeconfig get all -n runner
+NAME                          READY   STATUS             RESTARTS      AGE
+pod/runner-5b4b5ddf49-67m6j   0/1     CrashLoopBackOff   4 (21s ago)   2m19s
+
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/runner   0/1     1            0           2m19s
+
+NAME                                DESIRED   CURRENT   READY   AGE
+replicaset.apps/runner-5b4b5ddf49   1         1         0       2m19s
+#+end_src
+
+- I've first looked into the pod and the deployment details for finding an error
+- As there was no significant error cause identifiable, I thought about looking
+  for obvious syntax error in the runner Helm chart definition files
+- The pod itself does nothing besides running a bash command. The successful
+  bash command simply returns working, and only does so when a certain env
+  variable is checked.
+- As this variable was missing, I've hardcoded it in the very same deployment
+  definition file. And the pod was running its command as expected.
+
+**** Nginx-Ingress
+- According to my best knowledge, I've recognized that there is no service
+  definition inside the Helm chart for the web app.
+- About the ingress, I am not sure as I have 2 major concerns (that might not
+  be true):
+  1. The ingress-controller is in a different namespace than the web service
+  2. An additional ingress should be deployed in the same namespace exposing the
+     web service in particular
+
+***** Current FAQs (stuck)
+- In order to understand the service better, i compared running against Helm
+  template definitions.
+- Of concern was that I was looking for the selector labels set correctly:
+  #+begin_src bash
+apiVersion: v1
+kind: Service
+...
+selector:
+    app.kubernetes.io/instance: web
+    app.kubernetes.io/name: web
+  #+end_src
+
+- Both of those can also be found in the live deployment definition:
+#+begin_src bash
+apiVersion: apps/v1
+kind: Deployment
+...
+  labels:
+    app.kubernetes.io/instance: web
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: web
+    app.kubernetes.io/version: 1.16.0
+    helm.sh/chart: web-0.1.0
+#+end_src
+
+***** My next steps
+- I would like to directly go into a cluster node (here: docker) and try to
+  reach the service endpoint on its internal Cluster-IP
+- .. I tried but neither succeeded with reaching the Cluster-IP, nor was able to
+  run a simple curl-pod within the same namespace
+- .. I would need to understand KinD better, as both of the above methods should
+  not pose a problem.
 
 *** Remarks
 - I haven't been using _kind_ before. My local clusters where in [[https://minikube.sigs.k8s.io/docs/][minikube]], [[https://k3s.io/][k3s.io]],
@@ -37,6 +127,15 @@ prometheus      monitoring      1               2022-07-13 19:04:10.820234091 +0
   production the exact same way. I think this (pretty transparent) deployment
   pattern got neglected in the Kubernetes community a lot. I.e try running EKS
   locally???
+- So far, I already am stuck with the first relevant web service task. The major
+  problems I have was to simply deploy stuff on KinD and also the use of Helm
+  charts as an additional abstraction layer (no deployment logs or errors
+  visible, walking in the dark..)
+- A usual approach in working with a Cluster would be to first deploy a cluster
+  with the given technology (KinD) myself.
+- Handling a simple nginx would be the first task after cluster is understood
+- I would not use Helm as I see it more as a technology to really harden well
+  tested and well running applications.
 
 
 ** Exercise 2: Programming

@@ -28,6 +28,9 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: SKIP_LOOP
+              value: "1"
           command:
             - /bin/bash
             - -c
